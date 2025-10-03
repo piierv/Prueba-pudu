@@ -1,49 +1,517 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AulaPudu — Aprende sin fronteras</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ReFácil | Mobile Native Tab Bar</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 2. CSS INTEGRADO: Diseño Mobile-Native con Tab Bar Fijo */
+        
+        :root {
+            --color-primary: #009688;       /* Teal Oscuro */
+            --color-secondary: #4db6ac;     /* Teal Claro */
+            --color-accent: #ff9800;        /* Naranja Ámbar (CTA) */
+            --color-background: #f4f4f4;    /* Fondo Limpio */
+            --color-card: #ffffff;          
+            --color-text-dark: #333;
+            --color-shadow: rgba(0, 0, 0, 0.1);
+            --header-height: 56px;
+            --tabbar-height: 65px; /* Altura del menú inferior fijo */
+        }
+
+        /* --- Global Reset & Mobile Focus --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Montserrat', sans-serif;
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            background-color: var(--color-background);
+            color: var(--color-text-dark);
+            overflow-x: hidden;
+            padding-bottom: var(--tabbar-height); /* Espacio para el menú inferior */
+        }
+
+        /* --- Splash Screen --- */
+        #splash-screen {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, var(--color-primary) 0%, #004d40 100%);
+            z-index: 5000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+        #splash-screen.hidden { opacity: 0; visibility: hidden; }
+        .logo-text { color: white; font-size: 3rem; font-weight: 700; margin-bottom: 5px; }
+        .slogan { color: rgba(255, 255, 255, 0.9); font-size: 1.1rem; margin-bottom: 40px; font-weight: 400; }
+        .splash-btn { padding: 12px 30px; background-color: var(--color-accent); color: var(--color-text-dark); border-radius: 30px; font-weight: 600; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3); }
+
+        /* --- App Header (Top Bar) --- */
+        .app-header {
+            height: var(--header-height);
+            background-color: var(--color-primary);
+            color: white;
+            display: flex; justify-content: space-between; align-items: center; padding: 0 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            position: fixed; width: 100%; top: 0; z-index: 2000;
+        }
+        .app-header h1 { font-size: 1.2rem; font-weight: 700; }
+
+        /* --- Menú Fijo Inferior (Tab Bar) - Estilo NATIVO --- */
+        .tab-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: var(--tabbar-height);
+            background-color: var(--color-card);
+            box-shadow: 0 -3px 10px var(--color-shadow);
+            display: flex; justify-content: space-around; align-items: center; z-index: 3000;
+            border-top: 1px solid #eee;
+        }
+
+        .tab-item {
+            display: flex; flex-direction: column; align-items: center; text-decoration: none;
+            color: #777; font-size: 0.7rem; font-weight: 600; padding: 5px; transition: color 0.2s;
+            width: 20%;
+        }
+
+        .tab-icon { font-size: 1.6rem; margin-bottom: 3px; }
+
+        .tab-item.active { color: var(--color-secondary); }
+
+        /* --- Contenedor Principal y Vistas --- */
+        .app-container {
+            padding-top: var(--header-height);
+            min-height: calc(100vh - var(--header-height) - var(--tabbar-height));
+        }
+
+        .view { padding: 20px 15px; display: none; background-color: var(--color-background); }
+        .view.active { display: block; }
+
+        h2.view-title { font-size: 1.4rem; color: var(--color-primary); margin-bottom: 20px; border-left: 4px solid var(--color-secondary); padding-left: 10px; }
+
+        /* --- VISTA MAPA (Central y Fullscreen) --- */
+        #map-view { padding: 0; position: relative; } 
+        
+        #map {
+            height: calc(100vh - var(--header-height) - var(--tabbar-height)); /* Ocupa el espacio restante */
+            width: 100%;
+            z-index: 1; 
+        }
+
+        .map-filter-group { 
+            position: absolute; top: 15px; left: 15px; right: 15px; z-index: 10;
+            padding: 10px; background-color: rgba(255, 255, 255, 0.95); border-radius: 8px;
+            box-shadow: 0 2px 10px var(--color-shadow);
+        }
+        .map-filter-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-weight: 600; color: var(--color-primary); }
+
+        .fab-add {
+            position: absolute; bottom: 20px; right: 20px;
+            width: 50px; height: 50px; line-height: 50px;
+            background-color: var(--color-accent); color: white;
+            border-radius: 50%; text-align: center; font-size: 1.8rem; font-weight: 700;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); cursor: pointer; z-index: 50;
+        }
+
+        /* --- Home/Dashboard Cards --- */
+        .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .card { background-color: var(--color-card); padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px var(--color-shadow); text-align: center; cursor: pointer; border: 1px solid #eee; }
+        .card-icon { font-size: 2.5rem; color: var(--color-secondary); margin-bottom: 5px; }
+        .card h3 { font-size: 1rem; font-weight: 600; }
+
+        /* --- Formularios --- */
+        .form-group label { display: block; margin-top: 15px; margin-bottom: 5px; font-weight: 600; color: var(--color-primary); }
+        .form-group input, .form-group select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; margin-bottom: 5px; }
+        .call-to-action { width: 100%; padding: 14px; background-color: var(--color-accent); color: white; border-radius: 8px; font-weight: 600; margin-top: 20px; }
+        .call-to-action:hover { background-color: #e68900; }
+
+    </style>
 </head>
 <body>
-  <header class="site-header">
-    <div class="brand">
-      <img src="logo.svg" alt="AulaPudu logo" class="logo">
-      <h1>AulaPudu</h1>
+
+    <div id="splash-screen">
+        <div class="logo-text">ReFácil</div>
+        <div class="slogan">Tu aplicación nativa para reciclar en Temuco.</div>
+        <button class="splash-btn" onclick="hideSplashScreen()">INICIAR APP</button>
     </div>
-    <nav class="nav">
-      <a href="#">Inicio</a>
-      <span class="sep">|</span>
-      <a href="#">Cómo usar</a>
-      <span class="sep">|</span>
-      <a href="#">Contacto</a>
-    </nav>
-  </header>
 
-  <main class="hero">
-    <img src="pudu-large.svg" alt="Pudu illustration" class="pudu-big" aria-hidden="true">
-    <div class="hero-content" role="region" aria-label="Hero">
-      <p class="eyebrow">PLATAFORMA INTERACTIVA PARA APRENDIZAJE</p>
-      <h2 class="headline">Aprende sin fronteras</h2>
-      <p class="subhead">Conecta, aprende y enseña en un entorno digital interactivo, sin límites.</p>
+    <div id="app-shell" style="display: none;">
 
-      <div class="cta-list">
-        <a class="cta cta-yellow" href="#" role="button">
-          <img src="pudu-icon-grad.svg" alt="" class="cta-icon">
-          <span>Entrar como espectador</span>
-        </a>
+        <header class="app-header">
+            <h1 id="header-title">Inicio Rápido</h1>
+        </header>
 
-        <a class="cta cta-green" href="#" role="button">
-          <img src="pudu-icon.svg" alt="" class="cta-icon">
-          <span>Entrar como presentador</span>
-        </a>
-      </div>
+        <main class="app-container">
+            
+            <section id="home-view" class="view active">
+                <h2 class="view-title">Dashboard ReFácil</h2>
+                <p style="margin-bottom: 20px;">Acciones rápidas para empezar a reciclar hoy mismo.</p>
+                
+                <div class="home-grid">
+                    <div class="card" onclick="changeView('map-view'); filterMap('all');">
+                        <div class="card-icon">🗺️</div>
+                        <h3>Ver Mapa Completo</h3>
+                    </div>
+                    <div class="card" onclick="changeView('pickup-view');">
+                        <div class="card-icon">🚚</div>
+                        <h3>Agendar Retiro</h3>
+                    </div>
+                    <div class="card" onclick="changeView('community-view');">
+                        <div class="card-icon">📈</div>
+                        <h3>Mi Impacto</h3>
+                    </div>
+                    <div class="card" onclick="changeView('map-view'); filterMap('general');">
+                        <div class="card-icon">♻️</div>
+                        <h3>Puntos REP</h3>
+                    </div>
+                </div>
+
+                <h2 class="view-title" style="margin-top: 30px;">Filtros por Material</h2>
+                <div class="home-grid">
+                    <div class="card" onclick="changeView('map-view'); filterMap('carton');">
+                        <div class="card-icon" style="color:#8b4513;">📦</div>
+                        <h3>Cartón</h3>
+                    </div>
+                    <div class="card" onclick="changeView('map-view'); filterMap('plastico');">
+                        <div class="card-icon" style="color:#1e90ff;">🧴</div>
+                        <h3>Plástico</h3>
+                    </div>
+                    <div class="card" onclick="changeView('map-view'); filterMap('vidrio');">
+                        <div class="card-icon" style="color:#3cb371;">🍷</div>
+                        <h3>Vidrio</h3>
+                    </div>
+                    <div class="card" onclick="changeView('info-view');">
+                        <div class="card-icon" style="color:#607d8b;">💡</div>
+                        <h3>Info REP</h3>
+                    </div>
+                </div>
+            </section>
+
+            <section id="map-view" class="view">
+                <div class="map-filter-group">
+                    <select id="map-filter-select">
+                        <option value="all">Filtro Rápido: Mostrar Todos los Puntos</option>
+                        <option value="general">General (REP Envases)</option>
+                        <option value="carton">Solo Cartón</option>
+                        <option value="plastico">Solo Plástico</option>
+                        <option value="vidrio">Solo Vidrio</option>
+                    </select>
+                </div>
+                
+                <div id="map"></div>
+                <div class="fab-add" onclick="showAddPointModal()">+</div>
+            </section>
+
+            <section id="pickup-view" class="view">
+                <h2 class="view-title">🚚 Agendamiento a Domicilio</h2>
+                <div style="background: #e0f2f1; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 3px solid var(--color-primary);">
+                    <p style="font-weight: 600; color: var(--color-primary);">Tarifa Fija **$2.990**.</p>
+                </div>
+                
+                <form id="pickup-form" class="form-group">
+                    <label for="material-pickup">Material Principal de Retiro:</label>
+                    <select id="material-pickup" required>
+                        <option value="">Seleccione material...</option>
+                        <option value="envases">Envases y Embalajes (Mixto)</option>
+                        <option value="papel">Papel y Cartón</option>
+                        <option value="vidrio">Vidrio</option>
+                        <option value="plastico">Plásticos</option>
+                    </select>
+
+                    <label for="address-pickup">Dirección de Retiro (Temuco):</label>
+                    <input type="text" id="address-pickup" placeholder="Ej: Av. Cautín 450" required>
+
+                    <label for="date-pickup">Fecha y Hora Preferida:</label>
+                    <input type="datetime-local" id="date-pickup" required>
+
+                    <button type="submit" class="call-to-action">Confirmar Agendamiento</button>
+                </form>
+            </section>
+
+            <section id="community-view" class="view">
+                <h2 class="view-title">📈 Mi Impacto y KPIs</h2>
+                <p style="margin-bottom: 20px;">Tu contribución a las metas de Economía Circular en Chile.</p>
+                
+                <div class="home-grid">
+                    <div class="card">
+                        <h4>Retiros Completados</h4>
+                        <div id="count-pickups" class="kpi-value" style="color: var(--color-primary);">0</div>
+                    </div>
+                    <div class="card">
+                        <h4>Kilos Reciclados (Total)</h4>
+                        <div id="kilos-recycled" class="kpi-value" style="color: var(--color-primary);">0.0 kg</div>
+                    </div>
+                    <div class="card">
+                        <h4>Ahorro CO₂ Simulado</h4>
+                        <div id="co2-saved" class="kpi-value" style="color: var(--color-primary);">0.0 kg</div>
+                    </div>
+                    <div class="card">
+                        <h4>Participación Local</h4>
+                        <div id="active-users" class="kpi-value" style="color: var(--color-primary);">12.5%</div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="info-view" class="view">
+                <h2 class="view-title">💡 Educación y Ley REP</h2>
+                <div class="card" style="margin-bottom: 15px;">
+                    <div class="card-icon" style="color: var(--color-secondary);">📘</div>
+                    <h3>Ley N.° 20.920 (REP)</h3>
+                    <p style="font-size: 0.9em; margin-top: 5px;">Obliga a productores a gestionar residuos de envases. ReFácil es tu aliado para cumplirla.</p>
+                </div>
+
+                <div class="card" style="margin-bottom: 15px;">
+                    <div class="card-icon" style="color: var(--color-secondary);">📊</div>
+                    <h3>Metas Nacionales</h3>
+                    <p style="font-size: 0.9em; margin-top: 5px;">Chile busca reciclar 30% de residuos municipales al 2030. ¡Tu acción cuenta!</p>
+                </div>
+            </section>
+
+        </main>
+        
+        <nav class="tab-bar">
+            <a href="#" class="tab-item active" data-view="home-view" data-title="Inicio Rápido">
+                <span class="tab-icon">🏠</span>
+                <span>Inicio</span>
+            </a>
+            <a href="#" class="tab-item" data-view="map-view" data-title="Mapa de Puntos">
+                <span class="tab-icon">🗺️</span>
+                <span>Mapa</span>
+            </a>
+            <a href="#" class="tab-item" data-view="pickup-view" data-title="Agendar Retiro">
+                <span class="tab-icon">🚚</span>
+                <span>Retiro</span>
+            </a>
+            <a href="#" class="tab-item" data-view="community-view" data-title="Mi Impacto">
+                <span class="tab-icon">📈</span>
+                <span>Impacto</span>
+            </a>
+            <a href="#" class="tab-item" data-view="info-view" data-title="Info/Ajustes">
+                <span class="tab-icon">💡</span>
+                <span>Info</span>
+            </a>
+        </nav>
     </div>
-  </main>
 
-  <footer class="site-footer" aria-hidden="true">
-    <!-- empty for now -->
-  </footer>
+    <div id="add-point-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="color: var(--color-primary);">Sugerir Punto Público</h3>
+            <p style="font-size: 0.9em; margin-bottom: 15px;">El punto se registrará en el centro actual del mapa para su validación.</p>
+            <form id="add-point-form" class="form-group">
+                <label for="point-name">Nombre Sugerido:</label>
+                <input type="text" id="point-name" placeholder="Ej: Punto UACH" required>
+
+                <label for="point-type">Tipo de Reciclaje:</label>
+                <select id="point-type" required>
+                    <option value="general">General (REP - Envases)</option>
+                    <option value="carton">Solo Cartón</option>
+                    <option value="plastico">Solo Plástico</option>
+                    <option value="vidrio">Solo Vidrio</option>
+                </select>
+
+                <button type="submit" class="call-to-action">Enviar Sugerencia</button>
+                <button type="button" class="call-to-action" style="background-color: #757575;" onclick="hideAddPointModal()">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <script>
+        // --- Variables de Estado Global ---
+        let totalPickups = 0;
+        let totalKilos = 0;
+        let totalCo2 = 0;
+        let map;
+        const temucoCoords = [-38.7359, -72.6028]; 
+        let currentMarkers = [];
+        const headerTitle = document.getElementById('header-title');
+        
+        const initialPoints = [
+            { name: "Punto Verde UCT", lat: -38.7300, lng: -72.6000, type: "general" },
+            { name: "Contenedor Municipal Vidrio", lat: -38.7450, lng: -72.6100, type: "vidrio" },
+            { name: "Reciclador El Bosque Plásticos", lat: -38.7500, lng: -72.5950, type: "plastico" },
+            { name: "Centro de Acopio Cartón", lat: -38.7200, lng: -72.6050, type: "carton" },
+            { name: "Punto Rep Sur", lat: -38.7400, lng: -72.6200, type: "general" },
+            { name: "Plaza Pinto Cartón", lat: -38.7300, lng: -72.5890, type: "carton" },
+            { name: "Villa Alegre Vidrio", lat: -38.7550, lng: -72.6050, type: "vidrio" }
+        ];
+        
+        // --- NAVEGACIÓN Y TAB BAR ---
+        
+        function hideSplashScreen() {
+            document.getElementById('splash-screen').classList.add('hidden');
+            document.getElementById('app-shell').style.display = 'block';
+            changeView('home-view'); // Inicia en el Dashboard
+            setTimeout(initializeMap, 100);
+        }
+        
+        function updateHeader(title) {
+            headerTitle.textContent = title;
+        }
+
+        function updateTabBar(viewId) {
+            document.querySelectorAll('.tab-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            const activeItem = document.querySelector(`.tab-item[data-view="${viewId}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+                updateHeader(activeItem.getAttribute('data-title'));
+            }
+        }
+
+        function changeView(viewId) {
+            document.querySelectorAll('.view').forEach(view => {
+                view.classList.remove('active');
+            });
+            document.getElementById(viewId).classList.add('active');
+            updateTabBar(viewId);
+            
+            // Refrescar mapa si es la vista activa
+            if (viewId === 'map-view' && map) {
+                setTimeout(() => map.invalidateSize(), 50);
+            }
+        }
+        
+        document.querySelectorAll('.tab-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                changeView(item.getAttribute('data-view'));
+            });
+        });
+
+
+        // --- MAPA LEAFLET y FILTRADO ---
+        
+        function getIconHTML(type) {
+            const icons = {
+                general: { char: '♻️', color: '#00897b' },
+                carton: { char: '📦', color: '#8b4513' }, 
+                plastico: { char: '🧴', color: '#1e90ff' }, 
+                vidrio: { char: '🍷', color: '#3cb371' }, 
+                suggested: { char: '❓', color: '#ff9800' }
+            };
+            const { char, color } = icons[type] || icons.general;
+
+            return `<div style="background-color: ${color}; color: white; border-radius: 50%; width: 35px; height: 35px; text-align: center; line-height: 35px; font-size: 1.2rem; font-weight: 600; border: 3px solid white; box-shadow: 0 0 8px rgba(0,0,0,0.4);">${char}</div>`;
+        }
+        
+        function addMarkerToMap(point) {
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: getIconHTML(point.type),
+                iconSize: [35, 45],
+                iconAnchor: [17, 45]
+            });
+            
+            const marker = L.marker([point.lat, point.lng], { icon: icon }).addTo(map)
+                .bindPopup(`<b>${point.name}</b><br>Tipo: ${point.type.toUpperCase()}<br><a href="#" onclick="changeView('pickup-view')">Agendar Retiro Cerca</a>`);
+                
+            currentMarkers.push({ marker: marker, type: point.type });
+        }
+
+        function filterMap(filterType) {
+            if (!map) return;
+            
+            currentMarkers.forEach(item => {
+                map.removeLayer(item.marker);
+            });
+            currentMarkers = [];
+            
+            const filteredPoints = initialPoints.filter(p => filterType === 'all' || p.type === filterType);
+            
+            filteredPoints.forEach(addMarkerToMap);
+            
+            // Sincroniza el filtro del selector si se llama desde un card (Home)
+            document.getElementById('map-filter-select').value = filterType;
+        }
+
+        function initializeMap() {
+            if (map) return;
+            
+            map = L.map('map').setView(temucoCoords, 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | ReFácil'
+            }).addTo(map);
+
+            filterMap('all');
+            
+            document.getElementById('map-filter-select').addEventListener('change', (e) => {
+                filterMap(e.target.value);
+            });
+            
+            setTimeout(() => { map.invalidateSize(); }, 300); 
+        }
+
+        // --- MODAL Y KPIs ---
+        
+        function showAddPointModal() { document.getElementById('add-point-modal').style.display = 'flex'; }
+        function hideAddPointModal() { document.getElementById('add-point-modal').style.display = 'none'; }
+
+        document.getElementById('add-point-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!map) { alert("El mapa no está cargado."); return; }
+            
+            const name = document.getElementById('point-name').value;
+            const type = document.getElementById('point-type').value;
+            const center = map.getCenter();
+
+            const newPoint = { 
+                name: `${name} (Sugerido - ${type.toUpperCase()})`, 
+                lat: center.lat, 
+                lng: center.lng, 
+                type: 'suggested'
+            };
+            
+            addMarkerToMap(newPoint);
+            
+            alert(`Sugerencia de punto enviada y marcada en el mapa.`);
+            document.getElementById('add-point-form').reset();
+            hideAddPointModal();
+        });
+
+        const pickupForm = document.getElementById('pickup-form');
+        
+        function updateKPIs(kilosToAdd) {
+            totalPickups += 1;
+            totalKilos += kilosToAdd;
+            totalCo2 += kilosToAdd * 2.4; 
+
+            document.getElementById('count-pickups').textContent = totalPickups;
+            document.getElementById('kilos-recycled').textContent = `${totalKilos.toFixed(1)} kg`;
+            document.getElementById('co2-saved').textContent = `${totalCo2.toFixed(1)} kg`;
+        }
+
+        pickupForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const material = document.getElementById('material-pickup').value;
+            const address = document.getElementById('address-pickup').value;
+            
+            const simulatedKilos = Math.floor(Math.random() * 10) + 5; 
+            
+            updateKPIs(simulatedKilos);
+
+            alert(`✅ ¡Retiro de ${material} en ${address} CONFIRMADO! Gracias por tu contribución de ${simulatedKilos} kg.`);
+
+            pickupForm.reset();
+            changeView('community-view'); 
+        });
+
+
+        // --- INICIALIZACIÓN FINAL ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateKPIs(0); 
+            // Esto asegura que el título inicial se cargue correctamente
+            updateHeader(document.querySelector('.tab-item.active').getAttribute('data-title'));
+        });
+    </script>
 </body>
 </html>
